@@ -1,0 +1,465 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[htt]{hyphenat}
+\usepackage[hidelinks]{hyperref}
+\usepackage{booktabs}
+\usepackage{listings}
+\hyphenation{ap-prox-i-mant tele-scop-ing mul-ti-mod-al-ity in-jec-tiv-ity}
+\sloppy
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\R}{\mathbb{R}}
+\DeclareMathOperator{\dH}{d_{H}}
+
+\title{Telescoping Bayesian Inference with Approximate Forward Operators:\\
+Corrected Convergence Theory, Multimodality as Loss of Injectivity,\\ and the Cost of Heavy Tails}
+\author{Josh Bald\\ \small Independent Researcher\\ \small jpbald93@gmail.com}
+\date{September 2026 \quad (V2)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Multilevel and telescoping methods for Bayesian inverse problems are well developed under ideal
+conditions. This paper is a \emph{corrected} revision of an earlier manuscript that claimed three
+results beyond the standard theory. Two of the three claims do not survive scrutiny; the third is
+provable only in a restricted form, which we give. Specifically, (i) the multilevel regime
+thresholds are $\gamma=\beta+2$, not $\gamma=\beta+1$, and the sub-optimal exponent is
+$-2-(\beta+2-\gamma)/k$ (the bias is $O(L^{-k})$, so $L\asymp\varepsilon^{-1/k}$); (ii) discretization-induced bimodality \emph{cannot} arise from a
+linear forward operator with a Gaussian prior --- the approximate posterior is then exactly Gaussian
+at every level --- and for the Runge--Kutta~4 surrogate of $\dot y=\lambda y$ it is a
+\emph{coarse-resolution transient} caused by non-injectivity of the numerical map, which disappears
+once the fold $\lambda=z^\star n/T$ leaves the prior's effective support, rather than persisting at
+all levels; and
+(iii) the claimed heavy-tail penalty $\rho(\alpha)=(\alpha-2)/(\alpha-1)$ is neither proved nor
+supported by the earlier paper's own experiment, which we reproduce and which in fact shows the full
+rate $-(k+1)$ for every tail index tested. We state precisely what is proved, what is verified
+numerically, and what remains open, and we ship a verification driver that regenerates every numeral
+in this paper.
+\end{abstract}
+
+\section{Introduction}
+
+\subsection{What this paper is}
+This is the corrected second version of a manuscript (hereafter \textbf{V1}) on telescoping
+Bayesian inference with approximate forward operators. V1's classical material (telescoping
+posterior decomposition, expectation convergence, variance decay, credible-interval convergence) is
+essentially correct and is retained, with repairs. V1's three advertised novel contributions,
+however, do not hold up:
+\begin{enumerate}
+\item its multilevel complexity regimes are off by one (\S\ref{sec:mlmc});
+\item its theory of discretization-induced bimodality rests on an invalid Hessian argument and on a
+      characterisation contradicted by its own example, and its empirical ``confirmation'' is a
+      simulation whose code hard-codes the bimodality it claims to explain (\S\ref{sec:bimodal});
+\item its heavy-tail penalty formula is asserted rather than derived, is attributed to a
+      mis-cited reference, and is not exhibited by its own experiment design (\S\ref{sec:tails}).
+\end{enumerate}
+We therefore \emph{retract} V1's Theorems 9.3 and 10.1 and its Theorem 8.4 as stated, and replace
+them with the correct statements below. Two of the replacement statements are theorems proved here;
+the third is explicitly posed as a conjecture with numerical evidence against V1's formula.
+
+\subsection{Status of the claims}
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Claim & Status in V2 & Where \\
+\midrule
+Telescoping decomposition & correct (elementary identity) & \S\ref{sec:frame} \\
+Expectation convergence $O(n^{-(k+1)})$ & correct (unchanged) & Thm~\ref{thm:conv} \\
+Variance-difference decay & correct (unchanged) & Thm~\ref{thm:var} \\
+MLMC regimes & \textbf{corrected} (thresholds $\gamma=\beta+2$) & Thm~\ref{thm:mlmc} \\
+Bimodality from linear $F$ & \textbf{impossible} (new, proved) & Thm~\ref{thm:obstruction} \\
+Bimodality from RK4 & \textbf{transient}, not persistent (new) & \S\ref{sec:rk4} \\
+Heavy-tail penalty $\rho(\alpha)$ & \textbf{not proved}; not observed numerically & \S\ref{sec:tails} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Notation}
+$X$ is a separable Banach space (parameter), $Y$ a separable Hilbert space (observations),
+$y=F(x)+\eta$ with $\eta\sim N(0,\Gamma)$. $\mu_0$ is a prior, $\mu^y$ the exact posterior, and
+$\mu_n^y$ the posterior induced by an approximate forward operator $F_n$. $k$ is the telescoping
+order: $\|F_{n+1}(x)-F_n(x)\|\le C(1+\|x\|^p)/n^{k+1}$.
+
+\section{Preliminaries}\label{sec:prelim}
+We use the Hellinger distance
+$\dH(\mu,\nu)^2=\int(\sqrt{d\mu/d\lambda}-\sqrt{d\nu/d\lambda})^2\,d\lambda$, which
+satisfies $\dH\in[0,\sqrt2]$ and $\dH=\sqrt{2(1-\rho)}$ with the Bhattacharyya coefficient $\rho$.
+(With the alternative normalisation $\tfrac12\int(\cdot)^2$ one has $\dH\in[0,1]$ and
+$\dH=\sqrt{1-\rho}$; V1 mixed the two conventions.)
+For a Gaussian prior satisfying Fernique's theorem there is $a>0$ with
+$\int\exp(a\|x\|^2)\,\mu_0(dx)<\infty$; we shall need the stronger, and separate, \emph{uniform}
+exponential-moment condition
+\begin{equation}\label{eq:unif}
+  \sup_{n\ge1}\int_X \exp\bigl(a\|x\|^{2p}\bigr)\,\mu_n^y(dx)<\infty
+\end{equation}
+with $p$ the polynomial-growth exponent. The potential is
+$\Phi_n(x;y)=\tfrac12\|\Gamma^{-1/2}(y-F_n(x))\|_Y^2$ and
+$d\mu_n^y/d\mu_0 = Z_n(y)^{-1}\exp(-\Phi_n(\cdot;y))$.
+
+We record the elementary facts we shall use, with proofs, because V1 got one of them wrong.
+
+\begin{lemma}[Telescoping tail; corrected]\label{lem:tail}
+Let $\alpha>1$. Then
+\[
+  \sum_{n\ge N} n^{-\alpha} \;\le\; N^{-\alpha} + \int_N^\infty t^{-\alpha}\,dt
+  \;=\; N^{-\alpha} + \frac{N^{1-\alpha}}{\alpha-1} \;\le\; \frac{C_\alpha}{N^{\alpha-1}},
+\]
+and in particular $\sum_{n\ge N} n^{-\alpha}=\Theta(N^{1-\alpha})$ (the \emph{tail}; note that
+$\sum_{n<N}n^{-\alpha}=\Theta(1)$ for $\alpha>1$).
+\end{lemma}
+\begin{proof}
+For decreasing $t\mapsto t^{-\alpha}$ we have $n^{-\alpha}\le\int_{n-1}^{n}t^{-\alpha}dt$ for
+$n\ge2$, so $\sum_{n\ge N+1}n^{-\alpha}\le\int_N^\infty t^{-\alpha}dt$, and adding the $n=N$ term
+gives the first bound; the second is immediate for $N\ge1$ with $C_\alpha=1+1/(\alpha-1)$.
+\end{proof}
+\begin{remark}
+V1 bounded $\int_{N-1}^\infty t^{-\alpha}dt=1/((\alpha-1)(N-1)^{\alpha-1})$ and then wrote
+``$\le1/((\alpha-1)N^{\alpha-1})$'', which is the wrong direction: the sum exceeds
+$1/((\alpha-1)N^{\alpha-1})$ (e.g.\ $\alpha=2,N=10$: $0.1052>0.1000$). The driver asserts both
+sides. The conclusion $\Theta(N^{-(\alpha-1)})$ is unaffected; only the displayed step was wrong.
+\end{remark}
+
+\section{Telescoping posteriors}\label{sec:frame}
+
+\begin{proposition}[Increment identity; correct]\label{prop:inc}
+$\displaystyle \Phi_{n+1}(x;y)-\Phi_n(x;y)
+   =-\langle\Gamma^{-1}(y-F_n(x)),\,F_{n+1}(x)-F_n(x)\rangle
+    +\tfrac12\|\Gamma^{-1/2}(F_{n+1}(x)-F_n(x))\|^2.$
+\end{proposition}
+\begin{proof}
+Write $a=y-F_n(x)$, $d=F_{n+1}(x)-F_n(x)$, so $y-F_{n+1}(x)=a-d$. Then
+$\Phi_{n+1}=\tfrac12\langle\Gamma^{-1}(a-d),a-d\rangle
+=\tfrac12\langle\Gamma^{-1}a,a\rangle-\langle\Gamma^{-1}a,d\rangle+\tfrac12\langle\Gamma^{-1}d,d\rangle$.
+\end{proof}
+
+\begin{corollary}\label{cor:incbound}
+Assume $\|F_n(x)\|_Y\le C(1+\|x\|_X^p)$ uniformly in $n$. Then
+$|\Phi_{n+1}(x;y)-\Phi_n(x;y)|\le C(1+\|x\|_X^{2p})(1+\|y\|_Y)n^{-(k+1)}+C(1+\|x\|_X^{2p})n^{-2(k+1)}$.
+\end{corollary}
+
+A standard dominated-convergence argument gives the following (V1's Theorem 5.2), which we do not
+repeat in full.
+
+\begin{theorem}[Posterior convergence of expectations]\label{thm:conv}
+Under the assumed growth and \eqref{eq:unif}, for every bounded Lipschitz $\varphi$ there is $C$
+with $|\E_{\mu^y_{n+1}}[\varphi]-\E_{\mu^y_n}[\varphi]|\le Cn^{-(k+1)}$, and hence
+$|\E_{\mu^y}[\varphi]-\E_{\mu^y_N}[\varphi]|\le C_1(kN^k)^{-1}$.
+\end{theorem}
+
+\begin{theorem}[Variance-difference decay]\label{thm:var}
+Under the hypotheses of Theorem~\ref{thm:conv}, $|\Var_{\mu^y_{n+1}}(\varphi)-\Var_{\mu^y_n}(\varphi)|=O(n^{-(k+1)})$.
+\end{theorem}
+
+\begin{proposition}[Credible intervals; correct hypotheses]\label{prop:ci}
+Let $\varphi$ be bounded with marginal densities $p_n$ under $\mu^y_n$, and let $F_n$ be the
+distribution function of $\varphi$ under $\mu^y_n$, with $\alpha$-quantile $q_\alpha^{(n)}$.
+Suppose (i) $\inf_n\inf_{|s-q_\alpha|<\delta}p_n(s)\ge c>0$ for some $\delta>0$, and (ii)
+$|F_n(q_\alpha)-\alpha|=O(\delta_n)$, where $q_\alpha=F^{-1}(\alpha)$. Then
+$|q_\alpha^{(n)}-q_\alpha|=O(\delta_n)$.
+\end{proposition}
+\begin{proof}
+By the mean value theorem applied to $F_n$,
+$|q_\alpha^{(n)}-q_\alpha|=|F_n(q_\alpha)-\alpha|/p_n(\xi_n)$ for some $\xi_n$ between the two
+quantiles. The numerator is $O(\delta_n)$ by (ii); the denominator is $\ge c$ by (i) once
+$|q_\alpha^{(n)}-q_\alpha|<\delta$.
+\end{proof}
+\begin{remark}
+Hypothesis (ii) is \emph{not} implied by convergence of the first two moments: two log-concave
+densities with identical mean and variance may have different quantiles. V1's Corollary 7.2 assumed
+only moment convergence and is therefore false; what is needed --- and what V1's own Lemma A.1 in
+fact used --- is convergence of the distribution function at the quantile. Note also that (i) is a
+hypothesis \emph{about the approximate posteriors}; it is automatic when they are log-concave, which
+\S\ref{sec:bimodal} shows holds for affine $F_n$ and Gaussian priors, but it can fail in general.
+\end{remark}
+
+\section{Multilevel complexity: corrected regimes}\label{sec:mlmc}
+Let $V_n=\Var(\Delta_n)=O(n^{-\gamma})$ and $C_n=O(n^{\beta})$, and let the estimator use $L$ levels
+with optimal allocation $N_n\propto\sqrt{V_n/C_n}$. The standard identity
+$\mathrm{Cost}(\varepsilon)\asymp\varepsilon^{-2}\bigl(\sum_{n<L}\sqrt{V_nC_n}\bigr)^2$ with
+$L\asymp\varepsilon^{-1/k}$ gives, since $\sqrt{V_nC_n}\asymp n^{(\beta-\gamma)/2}$,
+
+\begin{theorem}[MLMC complexity; corrected]\label{thm:mlmc}
+Write $s=(\beta-\gamma)/2$ and $L\asymp\varepsilon^{-1/k}$.
+\begin{enumerate}
+  \item If $\gamma>\beta+2$: $\ \sum_{n<L}n^{s}=O(1)$ and $\mathrm{Cost}(\varepsilon)=O(\varepsilon^{-2})$.
+  \item If $\gamma=\beta+2$: $\ \sum_{n<L}n^{s}=\Theta(\log L)$ and
+        $\mathrm{Cost}(\varepsilon)=O\bigl(\varepsilon^{-2}(\log\varepsilon)^2\bigr)$.
+  \item If $\gamma<\beta+2$: $\ \sum_{n<L}n^{s}=\Theta\bigl(L^{(\beta+2-\gamma)/2}\bigr)$ and
+        $\mathrm{Cost}(\varepsilon)=O\bigl(\varepsilon^{-2-(\beta+2-\gamma)/k}\bigr)$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+$\sum_{n<L}n^{s}$ converges iff $s<-1$, i.e.\ $\gamma>\beta+2$; at $s=-1$ it is $\Theta(\log L)$;
+for $s>-1$ it is $\Theta(L^{s+1})=\Theta(L^{(\beta+2-\gamma)/2})$. Substituting
+$L\asymp\varepsilon^{-1/k}$ gives (iii).
+\end{proof}
+\begin{remark}[Cutoff: the bias is $O(L^{-k})$, not $O(L^{-(k+1)})$]
+Theorem~\ref{thm:conv} bounds the \emph{increment} by $Cn^{-(k+1)}$; the level-$L$ bias is the tail
+sum $\sum_{n\ge L}|\E_{\mu_{n+1}}[\varphi]-\E_{\mu_n}[\varphi]|=O(L^{-k})$ by Lemma~\ref{lem:tail}
+with $\alpha=k+1$. Hence $L\asymp\varepsilon^{-1/k}$, not $\varepsilon^{-1/(k+1)}$. (The driver
+verifies $\sum_{n\ge L}n^{-(k+1)}=\Theta(L^{-k})$.) V1 used $L\asymp\varepsilon^{-1/(k+1)}$, which is
+inconsistent with its own bias corollary; we correct the cutoff here and correspondingly the
+exponent in case (iii).
+\end{remark}
+
+\begin{remark}[What V1 said, and why it is off by one]
+V1 asserted the threshold $\gamma>\beta+1$, the boundary case $\gamma=\beta+1\Rightarrow O(\log L)$,
+and the sub-optimal exponent $-2-(\beta+1-\gamma)/(k+1)$. Its own derivation contains the slip
+$(\beta-\gamma)/2+1=(\beta+1-\gamma)/2$, which is false: the left side is
+$(\beta+2-\gamma)/2$ (e.g.\ $\beta=1,\gamma=3$: left $=0$, right $=-\tfrac12$). With V1's threshold,
+the partial sums diverge: the driver reports $\sum_{n<10^6}n^{-3/4}\approx123$ at the V1 boundary,
+i.e.\ V1's ``$O(1)$'' case contains divergent sums. The empirical derivation of $\gamma$ from $k$
+(``$\gamma=2(k+1)$'') is in V1 and remains an assumption, not a theorem.
+\end{remark}
+
+\section{Discretization error and multimodality}\label{sec:bimodal}
+V1's Theorem 9.3 claimed that ``oscillatory error'' (RK4) causes bimodality whereas ``sign-definite
+error with $k\ge2$'' prevents it, and offered a Hessian argument. That argument is invalid: the
+Hessian of $-\log(d\mu^y_n/d\mu_0)$ omits the prior curvature, and the middle term below is missing
+from V1. Let $H_n$ be the Hessian of the negative logarithm of the \emph{density} of $\mu^y_n$ with
+respect to Lebesgue measure (prior included):
+\begin{equation}\label{eq:hess}
+  H_n(x)=\nabla F_n(x)^\top\Gamma^{-1}\nabla F_n(x)
+        -\bigl\langle\Gamma^{-1}(y-F_n(x)),\nabla^2F_n(x)\bigr\rangle
+        +\text{Prior}^{-1},
+\end{equation}
+and V1 dropped the middle term, which is indefinite and $O(1)$ in $n$. Two of V1's claims also
+contradict its own example: RK4 is a \emph{fourth}-order method (V1 labels it $k=1$), and the
+``odd/even-order'' dichotomy is not the same as the ``$k<2$ / $k\ge2$'' dichotomy.
+
+We replace Theorem 9.3 with two correct statements.
+
+\subsection{An obstruction: linear forward operators cannot produce bimodality}\label{sec:lin}
+\begin{theorem}[No bimodality for linear $F$; new]\label{thm:obstruction}
+Let $F_n(x)=A_nx+b_n$ be affine and let the prior be Gaussian, $\mu_0=N(m_0,\Sigma_0)$, with
+Gaussian noise. Then for every $n$ the approximate posterior $\mu_n^y$ is Gaussian, hence
+log-concave and unimodal; in particular no choice of discretisation of a \emph{linear} forward
+operator can induce a bimodal posterior at any level.
+\end{theorem}
+\begin{proof}
+$\Gamma^{-1/2}(y-A_nx-b_n)$ is affine in $x$, so $-\Phi_n$ is a concave quadratic in $x$ and
+$\exp(-\Phi_n)d\mu_0$ is (up to a constant) a Gaussian density; hence $\mu_n^y$ is Gaussian.
+Gaussian densities are strictly log-concave when $\Sigma_n\succ0$.
+\end{proof}
+\begin{remark}
+This is the sharpest correction to V1. It shows the pathology \emph{must} come from nonlinearity:
+in the O'Brien et al.\ setting the ODE $\dot y=\lambda y$ is linear in $y$ but its numerical
+solution is nonlinear in the \emph{parameter} $\lambda$. V1's ``sign-definite $\Rightarrow$ unimodal''
+criterion is simply the linear case in disguise.
+\end{remark}
+
+\subsection{The mechanism: non-injectivity of the numerical map}\label{sec:rk4}
+Consider $y=\varphi(\lambda)+\eta$, $\eta\sim N(0,\sigma^2)$, with the exact map
+$\varphi(\lambda)=e^{\lambda T}$ and its RK4 surrogate with $n$ steps of size $h=T/n$,
+\[
+  \varphi^{\mathrm{RK4}}_n(\lambda)=R(\lambda h)^{n},\qquad
+  R(z)=1+z+\tfrac{z^2}{2}+\tfrac{z^3}{6}+\tfrac{z^4}{24}.
+\]
+$e^{z}$ is strictly increasing, but $R$ is \emph{not}: $R'(z)=1+z+z^2/2+z^3/6$ has a root
+$z^\star=-1.5960716\ldots\in(-2,-1)$ at which $R$ attains an interior minimum $R(z^\star)=0.2703948$.
+Consequently $\lambda\mapsto R(\lambda h)^n$ is non-injective, with its fold at
+\begin{equation}\label{eq:nstar}
+  \lambda_{\mathrm{fold}}(n)=\frac{z^\star n}{T},
+\end{equation}
+while the exact map $e^{\lambda T}$ is strictly increasing. The fold is present for \emph{every} $n$
+and simply moves out to $|\lambda|=|z^\star|n/T$; what decides whether the posterior is bimodal is
+whether $\lambda_{\mathrm{fold}}(n)$ lies in the region carrying posterior mass, i.e.\ the prior's
+effective support $[m_0-3\sigma_0,\,m_0+3\sigma_0]$. For the tables below ($m_0=-1$, $\sigma_0=0.5$,
+$T=1$) this gives
+\[
+  |z^\star|\frac{n}{T}\lesssim |m_0|+3\sigma_0=2.5
+  \quad\Longleftrightarrow\quad n\lesssim1.57,
+\]
+so observable-mass bimodality is confined to $n=1$; for larger $n$ the fold lies outside the
+prior-supported region and the surviving secondary modes carry negligible mass (quantified below).
+
+The trapezoidal rule is different: $T(z)=(1+z/2)/(1-z/2)$ has $T'(z)=1/(1-z/2)^2>0$, so its
+surrogate is strictly increasing on the physical branch $z<2$ and cannot fold there. (It has a pole
+at $z=2$ and, for even $n$, a second preimage in the far tail $\lambda h>2$, but with negligible
+mass in the configurations considered.)
+
+\begin{center}
+\begin{tabular}{rlll}
+\toprule
+$n$ & exact & RK4 & trapezoidal \\
+\midrule
+$1$  & $1$ mode & \textbf{2 modes}: $-1.02$ and $-2.02$ (mass $0.11$) & $1$ mode \\
+$2$  & $1$ mode & $2$ modes: $-1.00$ and $-4.71$ (mass $2\times10^{-13}$) & $1$ mode \\
+$4$  & $1$ mode & $1$ mode & $1$ mode \\
+$8$  & $1$ mode & $1$ mode & $1$ mode \\
+$16$ & $1$ mode & $1$ mode & $1$ mode \\
+$64$ & $1$ mode & $1$ mode & $1$ mode \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Table 1. All local maxima of the posterior for $\lambda$ ($T=1$, prior $N(-1,0.5^2)$,
+$\sigma=0.05$, data $y=e^{-1}$), computed by the shipped driver with \emph{no} height threshold;
+``mass'' is the relative \emph{peak height} of the secondary mode (the integrated relative mass at
+$n=1$ is $0.094$). RK4 has a genuinely observable second
+mode (mass $O(10^{-1})$) only at the coarsest level; by $n=2$ the secondary mode is already
+exponentially suppressed, and it lies outside the prior-supported region for $n\ge4$.
+
+\begin{remark}[Correction of V1's Experiment 5]
+V1 reported that RK4 ``remains bimodal even at $n=64$''. Table~1 shows the opposite: an
+observable-mass fold exists only while \eqref{eq:nstar} fails, so the RK4 secondary mode's mass drops
+from $\approx0.11$ at $n=1$ to $\approx2\times10^{-13}$ at $n=2$ and is confined to the far prior tail
+thereafter. Moreover V1's published code for this experiment does not integrate any ODE: it
+hard-codes a bimodal \emph{mixture prior} $0.5N(-2,1)+0.5N(2,1)$ and ``refines'' by dividing the
+observation noise by $\sqrt n$. That experiment therefore says nothing about discretisation error,
+and V1's Table 8 has no reproducible source. We supply a genuine implementation in the driver.
+\end{remark}
+
+\begin{remark}[A correct diagnostic]
+Equation \eqref{eq:nstar} gives practitioners a check that V1's ``sign of $F_{n+1}-F_n$'' does not:
+compare the fold location $\lambda_{\mathrm{fold}}(n)=z^\star n/T$ with the prior's effective support
+$[m_0\pm3\sigma_0]$. Bimodality is possible only while the fold lies in that range, i.e.\
+$n\lesssim(|m_0|+3\sigma_0)T/|z^\star|$; it is not a fine-grid phenomenon.
+\end{remark}
+
+\section{Heavy-tailed priors: what is proved, and what is not}\label{sec:tails}
+V1's Theorem 10.1 claimed a sharp rate $\rho(\alpha)(k+1)$ with $\rho(\alpha)=(\alpha-2)/(\alpha-1)$
+for priors with polynomial tails $\sim\|x\|^{-\alpha}$. The proof is a truncation argument that does
+not close (the ``$2p$ term cancels in the optimization'' step is asserted, never performed), the
+matching lower bound is announced rather than derived, and the reference supporting it is mis-cited:
+V1's \texttt{[38]} gives DOI \texttt{10.1214/24-AOS2356}, which resolves to \emph{Stankewitz et al.,
+``Early stopping for $L^2$-boosting in high-dimensional linear models''}; the intended work is
+Agapiou--Castillo, \emph{Heavy-tailed Bayesian nonparametric adaptation}, Ann.\ Statist.\
+\textbf{52}(4) (2024), 1433--1459, DOI \texttt{10.1214/24-AOS2397}.
+
+What \emph{is} true is the following sufficient condition, which is what V1's own Lemma 6.2 in fact
+uses.
+
+\begin{proposition}[Sufficient condition]\label{prop:suff}
+If the uniform exponential-moment condition \eqref{eq:unif} holds, then the conclusion of
+Theorem~\ref{thm:conv} holds with the full rate $O(n^{-(k+1)})$; no degradation occurs.
+\end{proposition}
+\begin{proof}
+With $|\Delta\Phi_n|\le C(1+\|x\|^{2p})n^{-(k+1)}$ (Corollary~\ref{cor:incbound}) and Lemma
+$|e^{-t}-1|\le|t|e^{|t|}$, one has $\E_{\mu_n}[|e^{-\Delta\Phi_n}-1|]
+\le Cn^{-(k+1)}\E_{\mu_n}[(1+\|x\|^{2p})e^{C(1+\|x\|^{2p})n^{-(k+1)}}]$, which is
+$O(n^{-(k+1)})$ uniformly provided \eqref{eq:unif} holds. The normalisation ratio
+$Z_n/Z_{n+1}=1+O(n^{-(k+1)})$ follows the same way. Combining with the two-part split of V1's
+proof of Theorem 6.1 gives the claim.
+\end{proof}
+
+\begin{remark}[The condition is sufficient, not necessary --- and V1's experiment shows no penalty]
+Condition \eqref{eq:unif} fails for \emph{any} polynomial-tailed posterior (indeed for any
+non-Gaussian tail), so it cannot by itself establish degradation; and it turns out not to force it
+either. We reproduced V1's own Experiment 6 (which uses $F_n(\theta)=\theta(1-n^{-2})$, so $k=2$)
+with priors Gaussian, $t_{10}$, $t_5$, $t_3$, $t_2$, computing the \emph{consecutive}-level
+increment $|\E_{\mu_n}[\theta]-\E_{\mu_{n+1}}[\theta]|$:
+\begin{center}
+\begin{tabular}{lccccc}
+\toprule
+prior & Gaussian & $t_{10}$ & $t_5$ & $t_3$ & $t_2$ \\
+\midrule
+measured slope & $-2.97$ & $-2.97$ & $-2.97$ & $-2.97$ & $-2.97$ \\
+V1's $\rho(\alpha)(k+1)$ & $-3.000$ & $-2.667$ & $-2.250$ & $-1.500$ & $\phantom{-}0.000$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The measured rate is $-(k+1)$ in every case; there is no degradation, and V1's Table 9 (which
+reported $-2.61,-2.19,-1.47$ for the same priors) is not reproducible from its own model. What goes
+wrong in V1 is the inference ``the sufficient condition fails $\Rightarrow$ the rate degrades''.
+\end{remark}
+
+\begin{conjecture}[Open problem]\label{conjecture}
+Characterise the exact degradation of the telescoping rate under heavy-tailed priors: for which
+forward-approximation families and which tail indices does $|\E_{\mu_n}[\varphi]-\E_{\mu_{n+1}}[\varphi]|$
+fail to be $\Theta(n^{-(k+1)})$? We expect a genuine penalty to require the increment functional to
+be unbounded in the tail (so that $\E_{\mu_n}[\|x\|^{2p}]$ is not uniformly bounded), which the
+model above does not satisfy; but we have neither a proof of a positive rate in general nor a
+counterexample to one. V1's formula $\rho(\alpha)=(\alpha-2)/(\alpha-1)$ remains unproved and is not
+supported by numerics.
+\end{conjecture}
+
+\section{An extension, with corrected cost accounting}\label{sec:tkf}
+V1 proposed a telescoping Kalman filter (TKF) refining the transition model $A_n$ in time and claimed
+cost $O(T^{3/2})$ versus $O(T^2)$ for a fixed-model filter. That accounting is wrong: with the
+schedule $n_t=\lceil\sqrt t\rceil$, the per-step cost is $n_t^2\asymp t$, so
+$\sum_{t=1}^T n_t^2=\Theta(T^2)$ --- the same as $T\cdot n_T^2$. The driver reports
+$\sum_{t\le10^4}n_t^2=5.07\times10^7$ against $T^{3/2}=10^6$. There is therefore no asymptotic
+advantage; any gain is a constant-factor/early-transient effect, not a complexity improvement. We
+retain the TKF as a heuristic with no asymptotic claim.
+
+\section{Discussion}
+The corrected picture is smaller but sound. Telescoping Bayesian inference gives, under clean
+exponential moments, the rate $O(n^{-(k+1)})$ for posterior expectation differences
+(Theorem~\ref{thm:conv}), the same rate for variance differences (Theorem~\ref{thm:var}), and the
+standard multilevel cost with the correct threshold $\gamma=\beta+2$ (Theorem~\ref{thm:mlmc}). The
+two ``non-ideal'' phenomena that motivated V1 behave quite differently from what V1 claimed:
+discretisation-induced bimodality is impossible for linear forward operators
+(Theorem~\ref{thm:obstruction}) and, when it does occur, is a coarse-resolution transient tied to
+non-injectivity of the numerical map (\S\ref{sec:rk4}); and the heavy-tail ``penalty'' is, at least
+in the model that was supposed to exhibit it, absent (\S\ref{sec:tails}). Both are genuine open
+problems, now stated honestly.
+
+\paragraph{Reproducibility.} Every number in this paper is regenerated by
+\texttt{code/verify\_bt\_v2.py}, which asserts every claimed sign and threshold and exits nonzero on
+failure; it reports \texttt{ALL ASSERTIONS PASS}. The manuscript, the driver and the two independent
+vendor audit reports are archived at \url{https://github.com/jpbald93/bayesian-telescoping-v2}.
+Unlike V1, we claim no reproduction beyond these artifacts, and we cite no experiment we did not run.
+
+\section*{Change log relative to V1}
+\begin{itemize}
+\item \textbf{Retracted:} V1 Thm~9.3 (bimodality characterisation) --- invalid Hessian argument;
+replaced by Thm~\ref{thm:obstruction} and \S\ref{sec:rk4}.
+\item \textbf{Retracted:} V1 Thm~10.1 (heavy-tail penalty) --- unproved and unobserved; replaced by
+Prop~\ref{prop:suff} and Conjecture~\ref{conjecture} (see \S\ref{sec:tails}).
+\item \textbf{Corrected:} V1 Thm~8.4 thresholds $\beta+1\to\beta+2$ and exponent
+$-2-(\beta+1-\gamma)/(k+1)\to-2-(\beta+2-\gamma)/k$.
+\item \textbf{Corrected:} telescope tail lemma integral step (Lemma~\ref{lem:tail}).
+\item \textbf{Corrected:} TKF cost $O(T^{3/2})\to\Theta(T^2)$.
+\item \textbf{Corrected:} reference for heavy-tailed priors (DOI/venue/authors); the multimodal
+reference in V1 cited arXiv:0909.2126, which is a different 2009 paper (the intended work is
+O'Brien, Moores et al., arXiv:2502.11510, 2025).
+\item \textbf{Removed:} all numerical tables not reproducible from a shipped script, and the claim
+of a public reproduction repository.
+\end{itemize}
+
+\section*{Acknowledgments}
+The author acknowledges the use of AI-assisted tools for editorial and programming support. All
+mathematical statements, proofs and computations were verified against the shipped driver.
+
+\begin{thebibliography}{9}
+\bibitem{dashti} M.~Dashti and A.~M. Stuart, \emph{The Bayesian approach to inverse problems}, in
+  Handbook of Uncertainty Quantification, Springer (2017), 311--428.
+\bibitem{giles} M.~B. Giles, \emph{Multilevel Monte Carlo methods}, Acta Numer. \textbf{24} (2015),
+  259--328.
+\bibitem{dodwell} T.~J. Dodwell, C.~Ketelsen, R.~Scheichl, and A.~L. Teckentrup, \emph{Multilevel
+  Markov chain Monte Carlo}, SIAM Rev. \textbf{61} (2019), 509--545.
+\bibitem{jasra} A.~Jasra, K.~J.~H. Law, N.~Walton, and S.~Yang, \emph{Multi-index sequential Monte
+  Carlo ratio estimators for Bayesian inverse problems}, Found.\ Comput.\ Math.\ \textbf{24} (2024),
+  1249--1304.
+\bibitem{latz} J.~Latz, \emph{Bayesian inverse problems are usually well-posed}, SIAM Rev.
+  \textbf{65} (2023), 831--865.
+\bibitem{obrien} T.~O'Brien, M.~T. Moores, et al., \emph{Here be dragons: bimodal posteriors arise
+  from numerical integration error in longitudinal models}, arXiv:2502.11510 (2025).
+\bibitem{ac} S.~Agapiou and I.~Castillo, \emph{Heavy-tailed Bayesian nonparametric adaptation},
+  Ann.\ Statist.\ \textbf{52}(4) (2024), 1433--1459.
+\end{thebibliography}
+
+\appendix
+\section{Verification driver}\label{app:code}
+\texttt{code/verify\_bt\_v2.py} (Python; NumPy + mpmath) regenerates every numeral above and asserts:
+the tail bound (Lemma~\ref{lem:tail}); the corrected MLMC regimes (Theorem~\ref{thm:mlmc}), including
+the divergence at V1's threshold; monotonicity of $e^z$ and $T(z)$ and the interior minimum of $R$;
+the RK4/trapezoidal mode counts of Table~1; and the heavy-tail slopes of \S\ref{sec:tails}. It exits
+nonzero on any failed assertion and prints \texttt{ALL ASSERTIONS PASS}.
+
+\end{document}

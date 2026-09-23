@@ -1,0 +1,73 @@
+==========================================================================
+1. Telescoping tail lemma (correct integral step)
+==========================================================================
+  [ok ]   k=1 N=10: sum=1.051613e-01 <= N^-(k+1)+N^-k/k=1.100000e-01
+  [ok ]   k=1 N=1000: sum=9.955250e-04 <= N^-(k+1)+N^-k/k=1.001000e-03
+  [ok ]   k=1: Theta(N^-k) verified (ratio 1.005)
+  [ok ]   k=2 N=10: sum=5.524917e-03 <= N^-(k+1)+N^-k/k=6.000000e-03
+  [ok ]   k=2 N=1000: sum=5.004879e-07 <= N^-(k+1)+N^-k/k=5.010000e-07
+  [ok ]   k=2: Theta(N^-k) verified (ratio 1.009)
+  [ok ]   k=3 N=10: sum=3.866502e-04 <= N^-(k+1)+N^-k/k=4.333333e-04
+  [ok ]   k=3 N=1000: sum=3.338336e-10 <= N^-(k+1)+N^-k/k=3.343333e-10
+  [ok ]   k=3: Theta(N^-k) verified (ratio 1.014)
+==========================================================================
+2. MLMC complexity -- corrected regimes
+==========================================================================
+  Cost ~ eps^-2 (sum_{n<L} sqrt(V_n C_n))^2 ; s=(beta-gamma)/2 ; O(1) iff gamma>beta+2
+  [ok ]   beta=1 gamma=4: s=-1.50 sum=2.610e+00  O(1) iff gamma>3
+  [ok ]   beta=1 gamma=3: s=-1, sum~1.439e+01 (log divergence; V1 said O(1))
+  [ok ]   beta=2 gamma=4: s=-1, sum~1.439e+01 (log divergence; V1 said O(1))
+  [ok ]   beta=1 gamma=2.5: s=-0.75 sum=1.230e+02  O(1) iff gamma>3
+  [ok ]   beta=2 gamma=3.5: s=-0.75 sum=1.230e+02  O(1) iff gamma>4
+  [ok ]   beta=1 gamma=5: s=-2.00 sum=1.645e+00  O(1) iff gamma>3
+  [ok ]   negative control: the V1 cutoff/exponent pair does NOT reproduce the corrected scaling
+  [ok ]   case-(iii) exponent -2-(beta+2-gamma)/k: cost=3.526e+09 pred~5.623e+09
+  [ok ]   bias sum_(n>=L)n^-(k+1)=7.500e-07 = Theta(L^-k/k=1.000e-06)  => L~eps^-1/k
+  [ok ]   bias sum_(n>=L)n^-(k+1)=4.688e-13 = Theta(L^-k/k=5.000e-13)  => L~eps^-1/k
+  [ok ]   bias sum_(n>=L)n^-(k+1)=3.281e-19 = Theta(L^-k/k=3.333e-19)  => L~eps^-1/k
+==========================================================================
+3. Method maps: monotonicity
+==========================================================================
+  [ok ]   exp(z) strictly increasing
+  [ok ]   trapezoidal T(z) strictly increasing on z<2
+  [ok ]   RK4 R'(z) root z*=-1.5960716 in (-2,-1) => R non-monotone (interior min R(z*)=0.270395)
+    => RK4 map lambda |-> R(lambda h)^n is non-injective when |lambda|T > |z*| = 1.59607
+==========================================================================
+4. Discretization-induced bimodality (real RK4 vs trapezoidal)
+==========================================================================
+  y = phi_exact(lambda*) + eta ; T=1.0 lambda*=-1.0 prior=N(-1.0,0.5^2) sigma=0.05 y=0.367879
+    n=  1: EXACT 1 -1.00(m~1.0e+00) | RK4 2 -2.02(m~1.1e-01), -1.02(m~1.0e+00) | TRAP 1 -0.93(m~1.0e+00)
+    n=  2: EXACT 1 -1.00(m~1.0e+00) | RK4 2 -4.71(m~1.9e-13), -1.00(m~1.0e+00) | TRAP 1 -0.98(m~1.0e+00)
+    n=  3: EXACT 1 -1.00(m~1.0e+00) | RK4 1 -1.00(m~1.0e+00) | TRAP 1 -0.99(m~1.0e+00)
+    n=  4: EXACT 1 -1.00(m~1.0e+00) | RK4 1 -1.00(m~1.0e+00) | TRAP 1 -1.00(m~1.0e+00)
+    n=  8: EXACT 1 -1.00(m~1.0e+00) | RK4 1 -1.00(m~1.0e+00) | TRAP 1 -1.00(m~1.0e+00)
+    n= 16: EXACT 1 -1.00(m~1.0e+00) | RK4 1 -1.00(m~1.0e+00) | TRAP 1 -1.00(m~1.0e+00)
+    n= 32: EXACT 1 -1.00(m~1.0e+00) | RK4 1 -1.00(m~1.0e+00) | TRAP 1 -1.00(m~1.0e+00)
+    n= 64: EXACT 1 -1.00(m~1.0e+00) | RK4 1 -1.00(m~1.0e+00) | TRAP 1 -1.00(m~1.0e+00)
+  [ok ]   RK4 has an OBSERVABLE second mode at n=1 (relative mass > 1e-2)
+  [ok ]   RK4's n=2 second mode exists but is exponentially suppressed (mass < 1e-6)
+  [ok ]   RK4 secondary mode leaves the scanned region for n>=4
+  [ok ]   exact posterior unimodal throughout (monotone map)
+  [ok ]   trapezoidal posterior unimodal throughout (monotone map on prior support)
+==========================================================================
+5. Obstruction: linear forward operator + Gaussian prior
+==========================================================================
+  posterior = N(0.526012, 0.023121) exactly -- Gaussian, hence log-concave & unimodal
+  [ok ]   linear F + Gaussian prior => exact Gaussian posterior for EVERY level => its approximation cannot be bimodal
+==========================================================================
+6. Heavy-tail priors: does the rate degrade?
+==========================================================================
+  V1 Experiment-6 model F_n(theta)=theta(1-n^-2) (k=2).  consecutive-n increments:
+    Gaussian  slope=-2.973   V1's rho(alpha)*(k+1)=-3.000
+  [ok ]   Gaussian prior reproduces the (k+1)=3 rate
+    t_nu=10   slope=-2.973   V1's rho(alpha)*(k+1)=-2.667
+  [ok ]   t_nu=10: rate is STILL ~(k+1)=3 -> NO degradation (contradicts V1 Table 9)
+    t_nu=5    slope=-2.973   V1's rho(alpha)*(k+1)=-2.250
+  [ok ]   t_nu=5: rate is STILL ~(k+1)=3 -> NO degradation (contradicts V1 Table 9)
+    t_nu=3    slope=-2.973   V1's rho(alpha)*(k+1)=-1.500
+  [ok ]   t_nu=3: rate is STILL ~(k+1)=3 -> NO degradation (contradicts V1 Table 9)
+    t_nu=2    slope=-2.973   V1's rho(alpha)*(k+1)=-0.000
+  [ok ]   t_nu=2: rate is STILL ~(k+1)=3 -> NO degradation (contradicts V1 Table 9)
+==========================================================================
+RESULT: ALL ASSERTIONS PASS
+==========================================================================
