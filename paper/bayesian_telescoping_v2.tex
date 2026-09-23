@@ -26,7 +26,9 @@
 
 \title{Telescoping Bayesian Inference with Approximate Forward Operators:\\
 Corrected Convergence Theory, Multimodality as Loss of Injectivity,\\ and the Cost of Heavy Tails}
-\author{Josh Bald\\ \small Independent Researcher\\ \small jpbald93@gmail.com}
+\author{Josh Bald\\ \small Independent Researcher\\ \small jpbald93@gmail.com%
+\thanks{Manuscript source, the verification driver, and the two independent audit reports are
+available at \url{https://github.com/jpbald93/bayesian-telescoping-v2}.}}
 \date{September 2026 \quad (V2)}
 
 \begin{document}
@@ -432,6 +434,14 @@ O'Brien, Moores et al., arXiv:2502.11510, 2025).
 of a public reproduction repository.
 \end{itemize}
 
+\section*{Code and data availability}
+The complete reproduction package --- \LaTeX{} source, compiled PDF, the verification driver
+\texttt{code/verify\_bt\_v2.py} together with its recorded output, and the two independent vendor
+audit reports --- is archived at \url{https://github.com/jpbald93/bayesian-telescoping-v2}. Running
+\texttt{python3 verify\_bt\_v2.py} (NumPy + mpmath) regenerates every numeral in this paper and exits
+nonzero if any asserted sign or threshold fails. No table, figure or numerical claim in this paper
+depends on code or data outside that package.
+
 \section*{Acknowledgments}
 The author acknowledges the use of AI-assisted tools for editorial and programming support. All
 mathematical statements, proofs and computations were verified against the shipped driver.
@@ -456,7 +466,8 @@ mathematical statements, proofs and computations were verified against the shipp
 
 \appendix
 \section{Verification driver}\label{app:code}
-\texttt{code/verify\_bt\_v2.py} (Python; NumPy + mpmath) regenerates every numeral above and asserts:
+\texttt{code/verify\_bt\_v2.py} (Python; NumPy + mpmath;
+\url{https://github.com/jpbald93/bayesian-telescoping-v2}) regenerates every numeral above and asserts:
 the tail bound (Lemma~\ref{lem:tail}); the corrected MLMC regimes (Theorem~\ref{thm:mlmc}), including
 the divergence at V1's threshold; monotonicity of $e^z$ and $T(z)$ and the interior minimum of $R$;
 the RK4/trapezoidal mode counts of Table~1; and the heavy-tail slopes of \S\ref{sec:tails}. It exits
